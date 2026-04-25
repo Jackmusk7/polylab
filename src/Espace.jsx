@@ -319,7 +319,6 @@ export default function Espace() {
       }}>
         <Panel title="Notes" icon="📝"><NotesPanel /></Panel>
         <Panel title="À faire" icon="✓"><TodosPanel /></Panel>
-        <Panel title="Agenda" icon="📅"><AgendaPanel /></Panel>
       </div>
     </div>
   )
