@@ -112,6 +112,8 @@ const NotesPanel = () => {
 const TodosPanel = () => {
   const { items: todos, upsert, remove } = useSupabaseTable('todos', [])
   const [newText, setNewText] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
 
   const addTodo = async () => {
     if (!newText.trim()) return
@@ -127,6 +129,25 @@ const TodosPanel = () => {
 
   const toggle = async (todo) => {
     await upsert({ ...todo, done: !todo.done })
+  }
+
+  const startEdit = (todo) => {
+    setEditingId(todo.id)
+    setEditText(todo.text)
+  }
+
+  const saveEdit = async () => {
+    const original = todos.find(t => t.id === editingId)
+    if (original && editText.trim()) {
+      await upsert({ ...original, text: editText })
+    }
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
   }
 
   const pending = todos.filter(t => !t.done).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
@@ -146,7 +167,18 @@ const TodosPanel = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {pending.map(todo => (
-          <TodoRow key={todo.id} todo={todo} onToggle={() => toggle(todo)} onDelete={() => remove(todo.id)} />
+          <TodoRow
+            key={todo.id}
+            todo={todo}
+            isEditing={editingId === todo.id}
+            editText={editText}
+            setEditText={setEditText}
+            onToggle={() => toggle(todo)}
+            onDelete={() => remove(todo.id)}
+            onStartEdit={() => startEdit(todo)}
+            onSaveEdit={saveEdit}
+            onCancelEdit={cancelEdit}
+          />
         ))}
         {pending.length === 0 && (
           <div style={{
@@ -165,7 +197,18 @@ const TodosPanel = () => {
           <Label>Terminées ({done.length})</Label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
             {done.slice(0, 5).map(todo => (
-              <TodoRow key={todo.id} todo={todo} onToggle={() => toggle(todo)} onDelete={() => remove(todo.id)} />
+              <TodoRow
+                key={todo.id}
+                todo={todo}
+                isEditing={editingId === todo.id}
+                editText={editText}
+                setEditText={setEditText}
+                onToggle={() => toggle(todo)}
+                onDelete={() => remove(todo.id)}
+                onStartEdit={() => startEdit(todo)}
+                onSaveEdit={saveEdit}
+                onCancelEdit={cancelEdit}
+              />
             ))}
           </div>
         </div>
@@ -174,39 +217,70 @@ const TodosPanel = () => {
   )
 }
 
-const TodoRow = ({ todo, onToggle, onDelete }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '8px 10px',
-    background: theme.bgCard,
-    border: `1px solid ${theme.border}`,
-    borderRadius: radius.sm,
-    opacity: todo.done ? 0.5 : 1,
-  }}>
-    <button
-      onClick={onToggle}
-      style={{
-        width: 18, height: 18, borderRadius: 4,
-        border: `1.5px solid ${todo.done ? theme.accent : theme.border}`,
-        background: todo.done ? theme.accent : 'transparent',
-        cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#0a0b0f', fontSize: 11, fontWeight: 'bold',
-        flexShrink: 0,
-      }}
-    >
-      {todo.done && '✓'}
-    </button>
-    <span style={{
-      flex: 1, fontSize: 13,
-      color: theme.textPrimary,
-      textDecoration: todo.done ? 'line-through' : 'none',
+const TodoRow = ({ todo, isEditing, editText, setEditText, onToggle, onDelete, onStartEdit, onSaveEdit, onCancelEdit }) => {
+  if (isEditing) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 8,
+        padding: 10,
+        background: theme.bgCard,
+        border: `1px solid ${theme.accent}`,
+        borderRadius: radius.sm,
+      }}>
+        <Textarea
+          value={editText}
+          onChange={e => setEditText(e.target.value)}
+          rows={3}
+          autoFocus
+        />
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <Button variant="ghost" size="sm" onClick={onCancelEdit}>Annuler</Button>
+          <Button size="sm" onClick={onSaveEdit}>Enregistrer</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '8px 10px',
+      background: theme.bgCard,
+      border: `1px solid ${theme.border}`,
+      borderRadius: radius.sm,
+      opacity: todo.done ? 0.5 : 1,
     }}>
-      {todo.text}
-    </span>
-    <IconButton onClick={onDelete} title="Supprimer" danger>✕</IconButton>
-  </div>
-)
+      <button
+        onClick={onToggle}
+        style={{
+          width: 18, height: 18, borderRadius: 4,
+          border: `1.5px solid ${todo.done ? theme.accent : theme.border}`,
+          background: todo.done ? theme.accent : 'transparent',
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#0a0b0f', fontSize: 11, fontWeight: 'bold',
+          flexShrink: 0,
+        }}
+      >
+        {todo.done && '✓'}
+      </button>
+      <span style={{
+        flex: 1, fontSize: 13,
+        color: theme.textPrimary,
+        textDecoration: todo.done ? 'line-through' : 'none',
+        wordBreak: 'break-word',
+      }}>
+        {todo.text}
+      </span>
+      <div style={{ display: 'flex', gap: 2 }}>
+        {!todo.done && (
+          <IconButton onClick={onStartEdit} title="Modifier">✎</IconButton>
+        )}
+        <IconButton onClick={onDelete} title="Supprimer" danger>✕</IconButton>
+      </div>
+    </div>
+  )
+}
 
 // ========================
 // AGENDA DE LA SEMAINE
